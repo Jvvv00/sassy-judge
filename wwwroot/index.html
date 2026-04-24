@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sassy Judge</title>
+    <style>
+        body { font-family: sans-serif; text-align: center; padding: 50px; background: #1a1a1a; color: white; }
+        input[type="text"] { padding: 12px; width: 300px; border-radius: 5px; border: none; margin-bottom: 10px; }
+        button { padding: 10px 20px; background: #ff4757; color: white; border: none; cursor: pointer; border-radius: 5px; font-weight: bold; }
+        button:hover { background: #ff6b81; }
+        
+        #result { 
+            margin-top: 30px; 
+            font-style: italic; 
+            color: #ffa502; 
+            white-space: pre-wrap; 
+            text-align: left; 
+            max-width: 700px; 
+            margin-left: auto; 
+            margin-right: auto;
+            line-height: 1.6;
+        }
+
+        .judge-gallery { display: flex; justify-content: center; gap: 20px; margin-bottom: 30px; }
+        .judge-card { cursor: pointer; border: 2px solid transparent; padding: 10px; transition: 0.3s; border-radius: 10px; }
+        .judge-card img { width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid #444; }
+        .judge-card.active { border-color: #ff4757; background: #333; }
+        .judge-card.active img { border-color: #ff4757; }
+        
+        .upload-section { margin: 20px 0; border: 1px dashed #444; padding: 20px; border-radius: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Culinary Class Wars: The Judge</h1>
+    <div class="judge-gallery">
+        <div class="judge-card active" onclick="selectJudge('Ahn Sung-jae', this)">
+            <img src="images/Anh_Sung-jae.png" alt="Ahn Sung-jae">
+            <p>Ahn Sung-jae</p>
+        </div>
+
+        <div class="judge-card" onclick="selectJudge('Edward Lee', this)">
+            <img src="images/edward-lee.jpg" alt="Edward Lee">
+            <p>Edward Lee</p>
+        </div>
+
+        <div class="judge-card" onclick="selectJudge('Gordon Ramsay', this)">
+            <img src="images/gordon-ramsay.jpg" alt="Gordon Ramsay">
+            <p>Gordon Ramsay</p>
+        </div>
+    </div>
+
+    <input type="text" id="foodInput" placeholder="What did you cook?">
+    
+    <div class="upload-section">
+        <p>Show me the plate:</p>
+        <input type="file" id="imageInput" accept="image/*" onchange="previewImage(event)">
+        <img id="preview" style="display:none; width:250px; margin: 15px auto; border-radius: 10px; border: 2px solid #555;">
+    </div>
+    
+    <button onclick="askJudge()">Critique Me!</button>
+    <div id="result"></div>
+
+    <script>
+        let currentJudge = "Ahn Sung-jae";
+
+        function selectJudge(name, element) {
+            currentJudge = name;
+            
+            document.querySelectorAll('.judge-card').forEach(card => card.classList.remove('active'));
+            
+            element.classList.add('active');
+        }
+
+        function previewImage(event) {
+            const reader = new FileReader();
+            reader.onload = function() {
+                const output = document.getElementById('preview');
+                output.src = reader.result;
+                output.style.display = 'block';
+            };
+            if(event.target.files[0]) {
+                reader.readAsDataURL(event.target.files[0]);
+            }
+        }
+
+        async function askJudge() {
+            const food = document.getElementById('foodInput').value;
+            const resDiv = document.getElementById('result');
+            const fileInput = document.getElementById('imageInput');
+            
+            if(!food) {
+                alert("Please enter the name of your dish!");
+                return;
+            }
+
+            resDiv.innerText = `${currentJudge} is inspecting your plate...`;
+
+            try {
+                let base64Image = "";
+                if (fileInput.files[0]) {
+                    const reader = new FileReader();
+                    const promise = new Promise(resolve => reader.onload = () => resolve(reader.result));
+                    reader.readAsDataURL(fileInput.files[0]);
+                    const fullBase64 = await promise;
+                    base64Image = fullBase64.split(',')[1];
+                }
+
+                const payload = {
+                    food: food,
+                    judge: currentJudge,
+                    imageContent: base64Image
+                };
+
+                const response = await fetch(`http://localhost:5195/critique`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                
+                if (!response.ok) throw new Error("Server error");
+                
+                const data = await response.json();
+                resDiv.innerText = data.critique;
+
+            } catch (error) {
+                console.error("Error:", error);
+                resDiv.innerText = "The judge walked out! (Check your API key and Internet connection).";
+            }
+        }
+    </script>
+</body>
+</html>
